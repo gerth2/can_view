@@ -1,5 +1,7 @@
 # CAN View
-A USB-CanAnalyzer v7.00 python interface and GUI.
+A USB-CanAnalyzer v7.00 python interface and simple GUI.
+
+![picture of GUI](https://i.imgur.com/dwalw97.png)
 
 ![picture of physical hardware](https://statics3.seeedstudio.com/seeed/file/2017-07/bazaar520252_img_2550a.jpg)
 
