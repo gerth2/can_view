@@ -26,15 +26,14 @@ class CanPacket:
 
     def get_id_string(self):
         ret_str = str()
-        ret_str += "0x" 
-        ret_str += str(self.id)
+        ret_str += format(int.from_bytes(self.id, byteorder='little'), '#10X')
         return ret_str
 
     def get_data_string(self):
         ret_str = str()
         for byte in self.data :
             ret_str +=" "
-            ret_str +=str(byte)
+            ret_str +=format(byte, '02X')
         return ret_str
 
     def get_rx_time(self):
@@ -68,6 +67,8 @@ class DeviceInterface:
     CFG_STANDARD_MODE = 0x01
     TX_MAGIC_BYTE_FINAL = 0x55
 
+    MAX_BYTES_PER_UPDATE = 10000
+
     # RX State Machine variables
     RX_expectedIDBytes = 0
     RX_expectedDataBytes = 0
@@ -82,7 +83,7 @@ class DeviceInterface:
     # PUBLIC API
     #####################################################################
 
-    def __init__(self, speed_kbps=250, use_extended_frame=True, comport="COM5" ):
+    def __init__(self, speed_kbps=1024, use_extended_frame=True, comport="COM5" ):
         #So far:
         # --Filter unsupported
         # --Mask unsupported
@@ -220,31 +221,37 @@ class DeviceInterface:
 
         #Helper utility to check for a received byte matching the expected protocol
         def rx_check(actual, expected, reset_on_err=True):
-            if(actual == expected):
+            if(int(actual) == int(expected)):
                 self.rx_packet_byte_idx += 1
                 return True
             else:
                 if(reset_on_err):
-                    print("Error in packet RX: Got " + str(actual) + " but was expecting" + str(expected))
+                    #print("Error in packet RX: Got " + format(actual, '#04X') + " but was expecting " + format(expected, '#04X'))
                     self.rx_packet_byte_idx = 0
                 return False
 
+        byte_counter = 0
+
         if(self.sp is not None and self.sp.is_open):
             #As long as we have at least one packet, read it.
-            while(self.sp.in_waiting != 0): 
+            while(self.sp.in_waiting != 0 and byte_counter < self.MAX_BYTES_PER_UPDATE): 
+
+                byte_counter += 1
 
                 #Read exactly one byte out of the serial port buffer
-                new_byte = self.sp.read(size=1)
-                print("Got byte" + str(new_byte))
+                new_byte = int.from_bytes(self.sp.read(size=1), byteorder='little')
+                #print(str(self.rx_packet_byte_idx) + " " + format(new_byte,'#04x'))
 
                 # Handle this byte based on which byte we are currently on
                 if(self.rx_packet_byte_idx == 0):
-                    rx_check(new_byte,0x55)
-                    continue
-                elif(self.rx_packet_byte_idx == 1):
+                    if(int(new_byte) != 0xAA):
+                        #Discard bytes till the start marker 
+                        continue
+
+                if(self.rx_packet_byte_idx == 0):
                     rx_check(new_byte,0xAA)
                     continue
-                elif(self.rx_packet_byte_idx == 2):
+                elif(self.rx_packet_byte_idx == 1):
                     if(rx_check(new_byte&0xF0,0xC0,False)):
                         #Standard Packet incoming
                         self.RX_expectedIDBytes = 2
@@ -253,24 +260,28 @@ class DeviceInterface:
                         #Extended packet incoming
                         self.RX_expectedIDBytes = 4
                         self.RX_expectedDataBytes = int(new_byte&0x0F)
+
+                    #print(" --Expecting " + str(self.RX_expectedIDBytes) + " ID Bytes")
+                    #print(" --Expecting " + str(self.RX_expectedDataBytes) + " data bytes")
                     
                     self.RX_packetUnderConstruction = CanPacket(self.capture_start_time, self.prev_capture_time)
                     continue
-                elif(self.rx_packet_byte_idx in range(3, 3 + self.RX_expectedIDBytes)):
+                elif(self.rx_packet_byte_idx in range(2, 2 + self.RX_expectedIDBytes)):
                     #Receiving ID
                     self.RX_packetUnderConstruction.id_prepend(new_byte)
                     self.rx_packet_byte_idx += 1
                     continue
-                elif(self.rx_packet_byte_idx in range(3 + self.RX_expectedIDBytes, 3 + self.RX_expectedIDBytes + self.RX_expectedDataBytes )):
+                elif(self.rx_packet_byte_idx in range(2 + self.RX_expectedIDBytes, 2 + self.RX_expectedIDBytes + self.RX_expectedDataBytes )):
                     #Receiving Data
                     self.RX_packetUnderConstruction.data_prepend(new_byte)
                     self.rx_packet_byte_idx += 1
 
-                    if(self.rx_packet_byte_idx > 3 + self.RX_expectedIDBytes + self.RX_expectedDataBytes):
+                    if(self.rx_packet_byte_idx >= (2 + self.RX_expectedIDBytes + self.RX_expectedDataBytes)):
                         #Done receiving
                         self.RX_packetList.append(self.RX_packetUnderConstruction)
                         self.prev_capture_time = datetime.datetime.now()
                         self.rx_packet_byte_idx = 0
+                        #print(self.RX_packetList)
                     continue
                 else:
                     print("Developers goofed up???")

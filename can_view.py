@@ -129,14 +129,13 @@ class CanViewGui:
         return
 
     def periodic_update(self):
-        print("Periodic Update")
         msg_list = self.candevice.receive()
 
         for msg in msg_list:
             timestr = str(msg.get_rx_time_delta_start().total_seconds())
             self.insert_can_msg_display(timestr,msg.get_id_string(), msg.get_data_string())
 
-        self.master.after(250, self.periodic_update)
+        self.master.after(25, self.periodic_update)
         return
 
 
