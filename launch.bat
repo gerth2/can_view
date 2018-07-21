@@ -1,1 +1,1 @@
-start pythonw can_view.py
+start python can_view.py

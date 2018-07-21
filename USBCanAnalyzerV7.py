@@ -18,11 +18,11 @@ class CanPacket:
         self.start_time = starttime
         self.prev_time = prevtime
 
-    def id_prepend(self, byte_in):
-        self.id.insert(0, byte_in)
+    def id_add_byte(self, byte_in):
+        self.id.append(byte_in)
 
-    def data_prepend(self, byte_in):
-        self.data.insert(0, byte_in)
+    def data_add_byte(self, byte_in):
+        self.data.append(byte_in)
 
     def get_id_string(self):
         ret_str = str()
@@ -240,7 +240,7 @@ class DeviceInterface:
 
                 #Read exactly one byte out of the serial port buffer
                 new_byte = int.from_bytes(self.sp.read(size=1), byteorder='little')
-                #print(str(self.rx_packet_byte_idx) + " " + format(new_byte,'#04x'))
+                print(str(self.rx_packet_byte_idx) + " " + format(new_byte,'#04x'))
 
                 # Handle this byte based on which byte we are currently on
                 if(self.rx_packet_byte_idx == 0):
@@ -268,12 +268,12 @@ class DeviceInterface:
                     continue
                 elif(self.rx_packet_byte_idx in range(2, 2 + self.RX_expectedIDBytes)):
                     #Receiving ID
-                    self.RX_packetUnderConstruction.id_prepend(new_byte)
+                    self.RX_packetUnderConstruction.id_add_byte(new_byte)
                     self.rx_packet_byte_idx += 1
                     continue
                 elif(self.rx_packet_byte_idx in range(2 + self.RX_expectedIDBytes, 2 + self.RX_expectedIDBytes + self.RX_expectedDataBytes )):
                     #Receiving Data
-                    self.RX_packetUnderConstruction.data_prepend(new_byte)
+                    self.RX_packetUnderConstruction.data_add_byte(new_byte)
                     self.rx_packet_byte_idx += 1
 
                     if(self.rx_packet_byte_idx >= (2 + self.RX_expectedIDBytes + self.RX_expectedDataBytes)):
