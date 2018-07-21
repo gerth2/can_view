@@ -3,8 +3,9 @@ import tkinter.messagebox
 import tkinter.filedialog
 from tkinter import ttk
 import USBCanAnalyzerV7
+import Settings 
 import datetime
-import os
+import os 
 
 class CanViewGui:
 
@@ -50,6 +51,18 @@ class CanViewGui:
         self.candevice.send(id_bytes, data_bytes)
         return
 
+    # Handle user change of settings
+    def openSettings(self):
+        #Open dialog to have user input new settings
+        self.settings.openGUI(self.master)
+
+        #Push those settings into the subclasses
+        self.candevice.set_config(int(self.settings.can_baud_rate),
+                                  ('Extended' in str(self.settings.can_frame_size)),
+                                  str(self.settings.can_serial_comport.split()[0]),
+                                  int(self.settings.can_serial_baud)
+        )
+
     #Test Classes
     def insert_test_packet(self):
         self.insert_can_msg_display("0.025","0x0C152A6F", "AA F0 B1 C5 89 6F 3D 4C")
@@ -61,6 +74,9 @@ class CanViewGui:
         self.candevice = can_device
         self.master.title("Can Viewer")
 
+        #settings module
+        self.settings = Settings.Settings()
+
         #Top-level GUI objects
         self.menubar = Menu(self.master)
         self.filemenu = Menu(self.menubar, tearoff=0)
@@ -71,6 +87,8 @@ class CanViewGui:
         #Top level file menu/options
         self.filemenu.add_command(label="Load Database", command=self.load_database)
         self.filemenu.add_command(label="Export Report", command=self.export_report)
+        self.filemenu.add_separator()
+        self.filemenu.add_command(label="Settings", command=self.openSettings)
         self.filemenu.add_command(label="Test", command=self.insert_test_packet)
         self.filemenu.add_separator()
         self.filemenu.add_command(label="Exit", command=self.master.quit)
@@ -96,11 +114,13 @@ class CanViewGui:
         self.tree.counter = 0
         self.tree['columns'] = ('Time (s)', 'ID', 'Data')
         self.tree.heading('#0', text='Time', anchor=tkinter.CENTER)
-        self.tree.heading('#1', text='ID', anchor=tkinter.CENTER)
-        self.tree.heading('#2', text='Data', anchor=tkinter.CENTER)
-        self.tree.column('#0', stretch=tkinter.YES, minwidth=75, width=75)
-        self.tree.column('#1', stretch=tkinter.YES, minwidth=75, width=75)
-        self.tree.column('#2', stretch=tkinter.YES, minwidth=150, width=150)
+        self.tree.heading('#1', text='CAN ID', anchor=tkinter.CENTER)
+        self.tree.heading('#2', text='CAN Data', anchor=tkinter.CENTER)
+        self.tree.heading('#3', text='Name', anchor=tkinter.CENTER)
+        self.tree.column('#0', stretch=tkinter.YES, minwidth=85, width=85)
+        self.tree.column('#1', stretch=tkinter.YES, minwidth=85, width=85)
+        self.tree.column('#2', stretch=tkinter.YES, minwidth=170, width=170)
+        self.tree.column('#3', stretch=tkinter.YES, minwidth=130, width=130)
         self.tree.configure(yscrollcommand=self.vsb.set)
 
         # LAYOUT
