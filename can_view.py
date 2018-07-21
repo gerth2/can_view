@@ -3,7 +3,7 @@ import tkinter.messagebox
 import tkinter.filedialog
 from tkinter import ttk
 import USBCanAnalyzerV7
-import Settings 
+import Settings, Database
 import datetime
 import os 
 
@@ -24,11 +24,19 @@ class CanViewGui:
         return
 
     def load_database(self):
-        tkinter.messagebox.showinfo("Info", "General Kenobi!")
-
+        fname = tkinter.filedialog.askopenfilename( defaultextension='.xml', filetypes=[('Database XML file','*.xml'), ('All files','*.*')], initialdir=os.getcwd(), title="Open Database", initialfile='db.xml')
+        if(fname is None):
+            return
+        else:
+            self.msg_db.loadDb(fname)
+        
+        
     #Can message pane interaction
-    def insert_can_msg_display(self, time, ID, Data):
-        self.tree.insert('', 0, text= str(time), values=(ID, Data))
+    def insert_can_msg_display(self, time, id, can_data, name, subentries):
+        new_elem = self.tree.insert('', 0, text= str(time), values=(id, can_data,name))
+        for name in subentries:
+            datastr = "  ->" + name + " : " + subentries[name]
+            self.tree.insert(new_elem, 'end', text="", values=("","",datastr))
         self.tree.counter = self.tree.counter + 1
 
     def clear_can_msg_display(self):
@@ -65,7 +73,7 @@ class CanViewGui:
 
     #Test Classes
     def insert_test_packet(self):
-        self.insert_can_msg_display("0.025","0x0C152A6F", "AA F0 B1 C5 89 6F 3D 4C")
+        self.insert_can_msg_display("0.025","0x0C152A6F", "AA F0 B1 C5 89 6F 3D 4C", "My Message", {"val1": "25.9", "val2": "-34.3"})
 
 
     # Main Class
@@ -76,6 +84,9 @@ class CanViewGui:
 
         #settings module
         self.settings = Settings.Settings()
+
+        #database module
+        self.msg_db = Database.dbProcessor()
 
         #Top-level GUI objects
         self.menubar = Menu(self.master)
@@ -153,9 +164,17 @@ class CanViewGui:
 
         for msg in msg_list:
             timestr = str(msg.get_rx_time_delta_start().total_seconds())
-            self.insert_can_msg_display(timestr,msg.get_id_string(), msg.get_data_string())
+            msg_interpretation = self.msg_db.getInfo(msg.can_id, msg.can_data)
+            if(msg_interpretation != None):
+                name_str  = msg_interpretation['name']
+                data_dict = msg_interpretation['data']
+            else:
+                name_str  = ""
+                data_dict = {}
+                
+            self.insert_can_msg_display(timestr,msg.get_id_string(), msg.get_data_string(), name_str, data_dict)
 
-        self.master.after(25, self.periodic_update)
+        self.master.after(10, self.periodic_update)
         return
 
 
