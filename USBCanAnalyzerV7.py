@@ -59,7 +59,8 @@ class DeviceInterface:
     SUPPORTED_SPEEDS = {5:0x0C,10:0x0B,20:0x0A,50:0x09,100:0x08,125:0x07,200:0x06,250:0x05,400:0x04,500:0x03,800:0x02,1024:0x01}
     
     # Protocol tokens
-    START_TOKEN=0xAA
+    START_TOKEN_1=0x55
+    START_TOKEN_2=0xAA
     CMD_EXTENDED_MODE_TRANSFER = 0xF0
     CMD_STANDARD_MODE_TRANSFER = 0xC0
     CMD_CONFIGURE = 0x55
@@ -74,6 +75,9 @@ class DeviceInterface:
     RX_expectedDataBytes = 0
     RX_packetUnderConstruction = CanPacket(datetime.datetime.now(),datetime.datetime.now())
     RX_packetList = []
+
+    # settings variables
+    use_extended_frame=True
 
 
     #serial port object
@@ -90,10 +94,6 @@ class DeviceInterface:
         # --Mode hardcoded to "Normal"
         # --Frame type 
 
-        if(use_extended_frame == False):
-            # TODO: Test and support this
-            raise NotImplementedError
-
         if(speed_kbps not in self.SUPPORTED_SPEEDS):
             print("Error: specified CAN speed " + speed_kbps + "kbps is not supported! Choose from " + str(self.SUPPORTED_SPEEDS.keys))
             return
@@ -101,12 +101,20 @@ class DeviceInterface:
         #Configure but do not open serial port
         if(self.sp is None):
             self.sp = serial.Serial()
-            self.sp.baudrate=115200 #maybe?
+            self.set_config(speed_kbps, use_extended_frame, comport, 115200)
+        return
+
+    def set_config(self, speed_kbps, use_extended_frame, comport, serial_baud):
+        self.use_extended_frame = use_extended_frame
+
+        if(self.sp is not None):
+            self.sp.baudrate=serial_baud
             self.sp.port=comport
-            self.speed = self.SUPPORTED_SPEEDS[speed_kbps]
-            self.rx_packet_byte_idx = 0
-            self.capture_start_time = datetime.datetime.now()
-            self.prev_capture_time = self.capture_start_time
+
+        self.speed = self.SUPPORTED_SPEEDS[speed_kbps]
+        self.rx_packet_byte_idx = 0
+        self.capture_start_time = datetime.datetime.now()
+        self.prev_capture_time = self.capture_start_time
         return
 
     def open(self):
@@ -134,8 +142,14 @@ class DeviceInterface:
 
 
     def send(self, id, data):
-        if(len(id) != 4):
-            print("Err, Extended ID expected to be passed as a length 4 bytearray, MSB at index 0")
+
+        if(self.use_extended_frame):
+            expected_id_len = 4
+        else:
+            expected_id_len = 3
+
+        if(len(id) != expected_id_len):
+            print("Err, Extended ID expected to be passed as a length " + str(expected_id_len) + "bytearray, MSB at index 0")
             return
 
         num_bytes = len(data)
@@ -145,7 +159,7 @@ class DeviceInterface:
 
         if(self.sp is not None and self.sp.is_open):
             # Init with required header
-            send_buf = bytearray([self.START_TOKEN, 
+            send_buf = bytearray([self.START_TOKEN_2, 
                                   self.CMD_EXTENDED_MODE_TRANSFER|num_bytes,
                                  ])
             # Pack bytes LSB first
@@ -177,14 +191,17 @@ class DeviceInterface:
         if(self.sp is not None and self.sp.is_open):
             # Init with required header
             send_buf = bytearray()
-            send_buf.append(self.START_TOKEN)
+            send_buf.append(self.START_TOKEN_2)
             send_buf.append(self.CMD_CONFIGURE)
             #Pack mystery byte
             send_buf.append(0x12)
             #Pack byte indicating CAN bus speed
             send_buf.append(self.speed)
             #Pack frame type byte
-            send_buf.append(self.CFG_EXTENDED_MODE)
+            if(self.use_extended_frame):
+                send_buf.append(self.CFG_EXTENDED_MODE)
+            else:
+                send_buf.append(self.CFG_STANDARD_MODE)
             #Filter not supported
             send_buf.append(0x00)
             send_buf.append(0x00)
@@ -244,49 +261,60 @@ class DeviceInterface:
 
                 # Handle this byte based on which byte we are currently on
                 if(self.rx_packet_byte_idx == 0):
-                    if(int(new_byte) != 0xAA):
+                    if(int(new_byte) != self.START_TOKEN_1):
                         #Discard bytes till the start marker 
                         continue
 
+                # Process the byte, using the rx idx to know how to interpret this byte
                 if(self.rx_packet_byte_idx == 0):
-                    rx_check(new_byte,0xAA)
-                    continue
+                    #Start byte 1
+                    rx_check(new_byte,self.START_TOKEN_1)
+
                 elif(self.rx_packet_byte_idx == 1):
-                    if(rx_check(new_byte&0xF0,0xC0,False)):
+                    #Start byte 2
+                    rx_check(new_byte,self.START_TOKEN_2)
+
+                elif(self.rx_packet_byte_idx == 2):
+                    #MessageID length and data length byte
+                    if(rx_check(new_byte&0xF0,self.CMD_STANDARD_MODE_TRANSFER,False)):
                         #Standard Packet incoming
                         self.RX_expectedIDBytes = 2
                         self.RX_expectedDataBytes = int(new_byte&0x0F)
-                    elif(rx_check(new_byte&0xF0,0xE0,True)):
+                    elif(rx_check(new_byte&0xF0,self.CMD_EXTENDED_MODE_TRANSFER,True)):
                         #Extended packet incoming
                         self.RX_expectedIDBytes = 4
                         self.RX_expectedDataBytes = int(new_byte&0x0F)
-
+                    self.RX_packetUnderConstruction = CanPacket(self.capture_start_time, self.prev_capture_time)
                     #print(" --Expecting " + str(self.RX_expectedIDBytes) + " ID Bytes")
                     #print(" --Expecting " + str(self.RX_expectedDataBytes) + " data bytes")
-                    
-                    self.RX_packetUnderConstruction = CanPacket(self.capture_start_time, self.prev_capture_time)
-                    continue
-                elif(self.rx_packet_byte_idx in range(2, 2 + self.RX_expectedIDBytes)):
-                    #Receiving ID
+
+                elif(self.rx_packet_byte_idx in range(3, 3 + self.RX_expectedIDBytes)):
+                    # MessageID bytes
                     self.RX_packetUnderConstruction.id_add_byte(new_byte)
                     self.rx_packet_byte_idx += 1
-                    continue
-                elif(self.rx_packet_byte_idx in range(2 + self.RX_expectedIDBytes, 2 + self.RX_expectedIDBytes + self.RX_expectedDataBytes )):
-                    #Receiving Data
-                    self.RX_packetUnderConstruction.data_add_byte(new_byte)
-                    self.rx_packet_byte_idx += 1
 
-                    if(self.rx_packet_byte_idx >= (2 + self.RX_expectedIDBytes + self.RX_expectedDataBytes)):
-                        #Done receiving
+                elif(self.rx_packet_byte_idx in range(3 + self.RX_expectedIDBytes, 3 + self.RX_expectedIDBytes + self.RX_expectedDataBytes )):
+                    # Data Bytes
+                    if(self.RX_expectedDataBytes != 0):
+                        #Receiving Data
+                        self.RX_packetUnderConstruction.data_add_byte(new_byte)
+                        self.rx_packet_byte_idx += 1
+
+                        if(self.rx_packet_byte_idx >= (3 + self.RX_expectedIDBytes + self.RX_expectedDataBytes)):
+                            #Done receiving
+                            self.RX_packetList.append(self.RX_packetUnderConstruction)
+                            self.prev_capture_time = datetime.datetime.now()
+                            self.rx_packet_byte_idx = 0
+                            #print(self.RX_packetList)
+                    else:
+                        #No bytes sent. All done.
                         self.RX_packetList.append(self.RX_packetUnderConstruction)
                         self.prev_capture_time = datetime.datetime.now()
                         self.rx_packet_byte_idx = 0
-                        #print(self.RX_packetList)
-                    continue
+
                 else:
                     print("Developers goofed up???")
                     self.rx_packet_byte_idx = 0
-                    continue
 
     def __del__(self):
         self.close()
