@@ -45,7 +45,7 @@ class Settings():
 
         #This defines what gets read out of the .ini file. "fallback" values define the defaults
         self.can_baud_rate = getValWithDefault(config, 'V7CAN_DEVICE', 'can_baud_rate', 1024)
-        self.can_frame_size = getValWithDefault(config,'V7CAN_DEVICE','can_frame_size', True)
+        self.can_use_extended_frame = getValWithDefault(config,'V7CAN_DEVICE','can_use_extended_frame', True)
         self.can_serial_baud = getValWithDefault(config,'V7CAN_DEVICE', 'can_serial_baud', 115200)
         self.can_serial_comport = getValWithDefault(config,'V7CAN_DEVICE', 'can_serial_comport', "COM5")
 
@@ -54,7 +54,7 @@ class Settings():
 
         config['V7CAN_DEVICE'] = {}
         config['V7CAN_DEVICE']['can_baud_rate'] = str(self.can_baud_rate)
-        config['V7CAN_DEVICE']['can_frame_size'] = str(self.can_frame_size)
+        config['V7CAN_DEVICE']['can_use_extended_frame'] = str(self.can_use_extended_frame)
         config['V7CAN_DEVICE']['can_serial_baud'] = str(self.can_serial_baud)
         config['V7CAN_DEVICE']['can_serial_comport'] = str(self.can_serial_comport)
 
@@ -66,7 +66,7 @@ class Settings():
 class settingsDialogBox(tkinter.simpledialog.Dialog):
 
     can_baud_rate_options_str = ['5','10','20','50','100','125','200','250','400','500','800','1024']
-    can_extended_frame_options_str = ['Standard', 'Extended']
+    can_extended_frame_options_str = ['False', 'True']
     can_serial_baudrate_options_str = ['115200','2000000']
     can_serial_port_available_options_str = serial.tools.list_ports.comports()
 
@@ -98,7 +98,7 @@ class settingsDialogBox(tkinter.simpledialog.Dialog):
         self.e4 = OptionMenu(master, self.can_serial_port_available_options_sel_val, *self.can_serial_port_available_options_str)
 
         pickInitOption(self.settings.can_baud_rate,  self.can_baud_rate_options_str, self.can_baud_rate_options_sel_val)
-        pickInitOption(self.settings.can_frame_size,  self.can_extended_frame_options_str,  self.can_extended_frame_options_sel_val)
+        pickInitOption(self.settings.can_use_extended_frame,  self.can_extended_frame_options_str,  self.can_extended_frame_options_sel_val)
         pickInitOption(self.settings.can_serial_baud,  self.can_serial_baudrate_options_str,  self.can_serial_baudrate_options_sel_val)
         pickInitOption(self.settings.can_serial_comport,  self.can_serial_port_available_options_str,  self.can_serial_port_available_options_sel_val)
 
@@ -111,7 +111,7 @@ class settingsDialogBox(tkinter.simpledialog.Dialog):
     def apply(self):
 
         self.settings.can_baud_rate = int(self.can_baud_rate_options_sel_val.get())
-        self.settings.can_frame_size = bool(self.can_extended_frame_options_sel_val.get())
+        self.settings.can_use_extended_frame = bool(self.can_extended_frame_options_sel_val.get())
         self.settings.can_serial_baud = int(self.can_serial_baudrate_options_sel_val.get())
         self.settings.can_serial_comport = str(self.can_serial_port_available_options_sel_val.get())
 

@@ -66,7 +66,7 @@ class CanViewGui:
 
         #Push those settings into the subclasses
         self.candevice.set_config(int(self.settings.can_baud_rate),
-                                  ('Extended' in str(self.settings.can_frame_size)),
+                                  bool(self.settings.can_use_extended_frame),
                                   str(self.settings.can_serial_comport.split()[0]),
                                   int(self.settings.can_serial_baud)
         )

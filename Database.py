@@ -37,6 +37,8 @@
 #
 #
 ##################################################################################################
+import xml.etree.ElementTree as ET
+
 
 
 class dbProcessor():
@@ -49,11 +51,25 @@ class dbProcessor():
             self.msgInterpreterList = []
 
             #Parse XML
+            tree = ET.parse(fpath)
+            xml_root = tree.getroot()
 
-            #For each message interpreter in the XML file, make a new interpreter
+            if(xml_root != None):
+                #For each message interpreter in the XML file, make a new interpreter
+                for child in xml_root.findall('Interpreter'):
+                    new_interpreter = msgInterpreter(child.get('id_mask'), 
+                                                    child.get('id_compare'), 
+                                                    int(child.get('data_len'),0))
 
-            #For each data interpreter in the message interpreter, add it.
-
+                    #For each data interpreter in the message interpreter, add it.
+                    for dataint in child:
+                        new_interpreter.addDataInterpreter(dataint.get('Name'),
+                                                        dataint.get('Source'),
+                                                        int(dataint.get('Mask'),0),
+                                                        int(dataint.get('Downshift'),0),
+                                                        float(dataint.get('Scale')),
+                                                        float(dataint.get('Offset')))
+                    self.msgInterpreterList.append(new_interpreter)
         return
 
     def getInfo(self, can_id, can_data):

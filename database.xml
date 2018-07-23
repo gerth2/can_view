@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+  <CanDatabase>
+    <Interpreter id_mask="0xFFFFFF00" id_compare="0x12345600" data_len="8">
+       <DataElem Name="Addr" Source="id" Mask="0x000000FF" Downshift="0" Scale="1" Offset="0"/>
+       <DataElem Name="Speed" Source="data" Mask="0x00000000000AFF00" Downshift="8" Scale="0.125" Offset="0"/>
+    </Interpreter>
+    <Interpreter id_mask="0x00FFFF00" id_compare="0x00246600" data_len="6">
+       <DataElem Name="DataSample" Source="data" Mask="0x00000FF0" Downshift="4" Scale="3" Offset="-10"/>
+    </Interpreter>
+  </CanDatabase>
