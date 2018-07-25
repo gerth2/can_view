@@ -61,7 +61,7 @@ class DeviceInterface:
     # Protocol tokens
     START_TOKEN_1=0x55
     START_TOKEN_2=0xAA
-    CMD_EXTENDED_MODE_TRANSFER = 0xF0
+    CMD_EXTENDED_MODE_TRANSFER = 0xE0
     CMD_STANDARD_MODE_TRANSFER = 0xC0
     CMD_CONFIGURE = 0x55
     CFG_EXTENDED_MODE = 0x02
@@ -278,12 +278,16 @@ class DeviceInterface:
                     #MessageID length and data length byte
                     if(rx_check(new_byte&0xF0,self.CMD_STANDARD_MODE_TRANSFER,False)):
                         #Standard Packet incoming
-                        self.RX_expectedIDBytes = 2
+                        self.RX_expectedIDBytes = 3
                         self.RX_expectedDataBytes = int(new_byte&0x0F)
-                    elif(rx_check(new_byte&0xF0,self.CMD_EXTENDED_MODE_TRANSFER,True)):
+                    elif(rx_check(new_byte&0xF0,self.CMD_EXTENDED_MODE_TRANSFER,False)):
                         #Extended packet incoming
                         self.RX_expectedIDBytes = 4
                         self.RX_expectedDataBytes = int(new_byte&0x0F)
+                    else:
+                        self.rx_packet_byte_idx = 0
+                        continue
+
                     self.RX_packetUnderConstruction = CanPacket(self.capture_start_time, self.prev_capture_time)
                     #print(" --Expecting " + str(self.RX_expectedIDBytes) + " ID Bytes")
                     #print(" --Expecting " + str(self.RX_expectedDataBytes) + " data bytes")

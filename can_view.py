@@ -164,7 +164,7 @@ class CanViewGui:
 
         for msg in msg_list:
             timestr = str(msg.get_rx_time_delta_start().total_seconds())
-            msg_interpretation = self.msg_db.getInfo(msg.can_id, msg.can_data)
+            msg_interpretation = self.msg_db.getInfo(msg.id, msg.data)
             if(msg_interpretation != None):
                 name_str  = msg_interpretation['name']
                 data_dict = msg_interpretation['data']
